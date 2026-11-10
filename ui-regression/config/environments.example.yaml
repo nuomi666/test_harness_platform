@@ -1,0 +1,143 @@
+# ==============================================================================
+# UI 自动化 · 执行环境配置（模板）
+# ------------------------------------------------------------------------------
+# 本文件 = 「用哪个系统的哪个账号、跑哪些页面、按什么口径挑用例」的唯一配置源。
+#
+#   本文件（模板）      ui-regression/config/environments.example.yaml   ← 不要在这里填
+#   实际生效的配置      ui-regression/config/environments.yaml           ← 复制过去后在这里填
+#
+# ⚠️ environments.yaml 含真实账号密码 ⇒ 已在项目根 .gitignore 中排除，
+#    不进版本库、不进交付包；本模板文件（无真实凭据）才随交付走。
+#
+# 谁来读这份配置：
+#   · 平台前端「UI 自动化 → 环境配置」页 —— 表单字段与本文件一一对应，可在页面上改
+#     （页面里的【测试连接】= 用下面的账号密码真登录一次，验证连通性与登录定位是否正确）
+#   · 执行器 —— ENV_CHECK 阶段读 base_url / auth / browser / timeout；RUN 阶段读 pages
+#   · 候选池 —— selection 是候选用例的**初始筛选条件**（页面上可临时调整，不写死）
+#
+# 填写顺序（5 步）：
+#   ① environment.base_url
+#   ② auth.accounts 里的账号密码
+#   ③ 到前端点【测试连接】→ 登录成功再往下做（这一步能提前暴露 90% 的环境问题）
+#   ④ pages 里把要接入的页面 enabled 改成 true，并核对 path
+#   ⑤ selection 定筛选口径（分数 / 等级 / 可自动化性）
+# ==============================================================================
+
+version: 1
+
+# ==============================================================================
+# 一、被测环境
+# ==============================================================================
+environment:
+  id: sit                          # 环境标识（报告与日志里用它区分环境，如 sit / uat）
+  name: 测试环境(SIT)
+  base_url: ""                     # ★必填。例：http://10.1.2.3:8080（末尾不要带 /）
+
+  browser:
+    type: chromium                 # chromium / firefox / webkit
+    headless: false                # 首次调试建议 false（看得见操作过程）；稳定后再改 true
+    viewport: { width: 1600, height: 900 }
+    locale: zh-CN
+    slow_mo_ms: 0                  # 每步放慢的毫秒数，仅调试用；正式执行保持 0
+
+  timeout:
+    navigation_ms: 30000           # 页面跳转超时
+    element_ms: 15000              # 元素出现超时
+    expect_ms: 10000               # 断言等待超时
+
+# ==============================================================================
+# 二、登录方式与账号
+# ==============================================================================
+# 执行前会先登录一次，把登录态存成 storage_state.json 复用；失效则自动重登。
+# 所以这里要回答两件事：**怎么登录** + **用哪个账号登录**。
+auth:
+  mode: form                       # form=用账号密码登录 / storage=直接复用已有登录态文件（免登录）
+  login_path: /login               # 登录页路由（相对 base_url）
+  storage_state: artifacts/storage_state.json
+
+  form:                            # mode=form 时必填：登录表单三处控件的定位方式
+    username: { by: label, value: "用户名" }          # 按登录页实际文案改
+    password: { by: label, value: "密码" }
+    submit:   { by: role,  value: "button", name: "登录" }
+    captcha:
+      kind: none                   # none=无验证码 / manual=运行到此处暂停等人工输入 / fixed=固定验证码
+      value: ""                    # kind=fixed 时填固定验证码
+      manual_wait_s: 180           # kind=manual 时最长等待秒数
+
+  success_when: "URL 不再包含 /login，且出现顶部用户菜单"   # 登录成功的判据（写人能看懂的话即可）
+
+  accounts:                        # ★账号密码填这里；可配多个，由 pages[].account 指定用哪个
+    - id: bin_admin                # 账号标识（pages[].account 引用的就是它）
+      label: 卡BIN模块-管理员
+      username: ""                 # ★必填
+      password: ""                 # ★必填
+      pages: [pool, file_history, original, conflict_resolution]
+      note: "覆盖卡BIN 4 个页面；若各页面权限不同，可再加账号并分别指定"
+
+# ==============================================================================
+# 三、页面（= 要跑 UI 自动化的页面）
+# ==============================================================================
+# ⚠️ page 的取值必须与前端 src/config/scopes.js 的 PAGE_LIST 逐字一致，
+#    否则会静默对不上（与平台上「选错页面不会被描述纠正」是同一类坑）。
+# enabled: false 的页面不接入：候选池不显示、执行时跳过。
+pages:
+  - module: bin
+    page: pool                     # 卡BIN池管理
+    label: 卡BIN池管理
+    enabled: true
+    path: /bin/pool                # 该页路由（相对 base_url，按系统实际路由填）
+    account: bin_admin
+    ready_when: "查询结果表格可见，或明确显示空态提示"   # 页面就绪判据（避免没加载完就开始点）
+
+  - module: bin
+    page: file_history             # 卡BIN文件历史
+    label: 卡BIN文件历史
+    enabled: true
+    path: /bin/file-history
+    account: bin_admin
+    ready_when: "文件列表表格可见"
+
+  - module: bin
+    page: original                 # 卡BIN原数据文件历史
+    label: 卡BIN原数据文件历史
+    enabled: false                 # 待续：该页尚未评过分，先在候选池里补评再决定是否接入
+    path: /bin/original
+    account: bin_admin
+    ready_when: "文件列表表格可见"
+
+  - module: bin
+    page: conflict_resolution      # 卡BIN裁决页面
+    label: 卡BIN裁决页面
+    enabled: false                 # 待续：前置条件多为「需组合 fixture」，预计候选极少
+    path: /bin/conflict-resolution
+    account: bin_admin
+    ready_when: "冲突组列表可见"
+
+# ==============================================================================
+# 四、候选用例筛选（初始口径；页面上可临时调整，**不写死**）
+# ==============================================================================
+# ⚠️ 这一节只是候选池的「初始筛选条件」，不是执行闸门：
+#    真正跑哪些用例，由你在页面上勾选后生成执行计划决定。
+#    想看 100 分且 P0 的用例 ⇒ min_score: 100 + levels: [P0] 即可。
+selection:
+  score_field: total               # 用哪个分数筛：total=质量总分（现行口径）
+  min_score: 100                   # 分数下限（0~100）；想放宽就调低，例如 95
+  max_score: 100
+  levels: [P0]                     # 用例等级（空数组 [] = 不限）；要带 P1 就写 [P0, P1]
+  reviewed_only: true              # 只列「确实评审过」的用例（引擎B跑过；人工核过的记入 manual_reviewed）
+  manual_reviewed: []              # 人工逐条核过的用例名（视为已评审，不受分数限制）
+  automatability: []               # 可自动化性标签（空数组 = 不限），如 [可直接自动化]
+  fixture_single_only: false       # 只看「前置能用单点接口造出来」的（按评审给出的 fixture_pattern 判）
+  max_per_page: 0                  # 每页最多执行条数，0 = 不限
+  include_cases: []                # 手工指定必须执行（最高优先级，写用例名）
+  exclude_cases: []                # 手工排除（写用例名）
+
+# ==============================================================================
+# 五、执行参数（没有特别要求，保持默认即可）
+# ==============================================================================
+execution:
+  retries: 1                       # 失败重跑次数（用于识别偶发失败；重跑不改断言）
+  screenshot: on_failure           # always / on_failure / never
+  trace: on_failure                # playwright trace 记录时机
+  workers: 1                       # 并发数：同页面用例共享数据，建议先 1，稳定后再调
+  stop_on_env_failure: true        # 登录失败 / 前置造数失败 ⇒ 直接终止，不空跑

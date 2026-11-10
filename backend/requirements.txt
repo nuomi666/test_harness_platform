@@ -1,0 +1,21 @@
+﻿fastapi==0.104.1
+uvicorn==0.24.0
+chromadb==0.4.19
+pdfplumber==0.10.3
+sentence-transformers>=3.0
+pydantic==2.4.2
+python-dotenv==1.0.0
+python-multipart==0.0.6
+dashscope==1.14.0
+pyyaml==6.0.1
+pandas==2.1.4
+openpyxl==3.1.2    # Excel导出
+python-docx==0.8.11 # Word导出
+pymupdf==1.26.5 # pdf文件解析
+# ---------- 截图OCR能力（可选）----------
+# 说明：除安装以下Python包外，还需在本机安装 Tesseract-OCR 引擎，
+#       Windows 可在 image_ocr.py 中取消注释并配置 tesseract_cmd 路径。
+#       未安装时图片上传走降级逻辑，不影响其他功能。
+pytesseract==0.3.10
+Pillow==10.1.0
+openai>=1.0

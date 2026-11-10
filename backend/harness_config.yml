@@ -1,0 +1,12 @@
+harness:
+  plugin:
+    scan_on_startup: true
+    validate_contract: true
+    default_status: enabled
+  rag:
+    business_weight: 0.7
+    skill_weight: 0.3
+    filter_conflict: true
+  llm:
+    prompt_template: |
+      遵循skill定义完成任务。输入变量由skill引擎注入。
